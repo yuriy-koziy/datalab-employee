@@ -67,10 +67,10 @@ object Features {
               .withColumn("features", toDense($"features"))
               .select("features")
 
-            val clusters = new GaussianMixture().setK(2).run(featured.rdd[DenseVector])
-
-            val WSSSE = clusters.computeCost(featured.rdd[DenseVector])
-            println("Within Set Sum of Squared Errors = " + WSSSE)
+//            val clusters = new GaussianMixture().setK(2).run(featured.rdd[DenseVector])
+//
+//            val WSSSE = clusters.computeCost(featured.rdd[DenseVector])
+//            println("Within Set Sum of Squared Errors = " + WSSSE)
 
         } finally spark.close()
     }
