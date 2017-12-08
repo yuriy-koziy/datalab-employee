@@ -1,5 +1,9 @@
 package org.datalab.employee
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+import org.apache.spark.sql.functions.udf
 import scopt.OptionParser
 
 /**
@@ -57,4 +61,22 @@ package object features {
                 Arguments()
         }
     }
+
+    val timestampUDF = udf((dt: String) => {
+        val suffixMonth = dt.substring(3, 5)
+        LocalDateTime.parse(dt.replace(suffixMonth, suffixMonth.toLowerCase()), DateTimeFormatter.ofPattern("ddMMMyy:HH:mm:ss"))
+          .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+    })
+
+    val isDouble = (str: String) => str != null && str.matches("^[\\+\\-]{0,1}[0-9]+[\\.\\,][0-9]+$")
+    val weekdayUDF = udf((dt: String) => LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).getDayOfWeek.getValue)
+    val isDoubleUDF = udf((str: String) => isDouble(str))
+    val distanceBetweenUDF = udf((lat1: String,lon1: String,lat2: String, lon2: String) => {
+        if (isDouble(lat1) && isDouble(lat2) && isDouble(lon1) && isDouble(lon2)) {
+            val dx = lat1.toDouble - lat2.toDouble
+            val dy = lon1.toDouble - lon2.toDouble
+            Math.sqrt(dx * dx + dy * dy)
+        } else 0
+    })
+
 }
