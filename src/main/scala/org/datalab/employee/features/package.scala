@@ -2,6 +2,8 @@ package org.datalab.employee
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.WeekFields
+import java.util.Locale
 
 import org.apache.spark.ml.clustering.KMeans
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -72,6 +74,7 @@ package object features {
 
     val isDouble = (str: String) => str != null && str.matches("^[\\+\\-]{0,1}[0-9]+[\\.\\,][0-9]+$")
     val weekdayUDF = udf((dt: String) => LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).getDayOfWeek.getValue)
+    val yearWeekUDF = udf((dt: String) => LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).get(WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear()))
     val isDoubleUDF = udf((str: String) => isDouble(str))
     val toDoubleUDF = udf((str: String) => str.toDouble)
     val distanceBetweenUDF = udf((lat1: String,lon1: String,lat2: String, lon2: String) => {
@@ -87,7 +90,7 @@ package object features {
         // (clusters, error, error diff with prev)
         var errors: Seq[(Int, Double, Double)] = Seq()
 
-        for(k <- 2 to 10) {
+        for(k <- 2 to 6) {
             val error = clustersCost(featuredDataset, k)
 
             val last = errors.lastOption
@@ -98,15 +101,14 @@ package object features {
         }
 
         val (k, error, errorDif) = errors.tail.sortBy(_._3).last
-        println(s"Number of clusters: $k, error: $error, error diff: $errorDif")
-        k
+        (k, error, errorDif)
     }
 
     private[features] def clustersCost(featuredDataset: DataFrame, k: Int) = {
         val clustersModel = new KMeans()
                 .setK(k)
                 .setFeaturesCol("features")
-                .setMaxIter(100)
+                .setMaxIter(50)
                 .fit(featuredDataset)
 
         clustersModel.computeCost(featuredDataset)
