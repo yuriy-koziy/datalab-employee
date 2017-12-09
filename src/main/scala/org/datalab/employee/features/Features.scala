@@ -57,20 +57,14 @@ object Features {
             val toDense = udf((vec: SparkVector) => vec.toDense)
 
             val aNumber = calls.select("hash_number_A").distinct().takeAsList(1).get(0).getAs[String](0)
-            val aNumberCalls = calls.filter($"hash_number_A" === aNumber)
+            val aNumberCalls = calls.filter($"hash_number_A" === aNumber).cache()
             val featured = new VectorAssembler()
               .setInputCols(Array("lat", "lon"))
               .setOutputCol("features")
               .transform(aNumberCalls)
 
-            val clustersModel = new KMeans()
-                    .setK(3)
-                    .setFeaturesCol("features")
-                    .setMaxIter(100)
-                    .fit(featured)
-
-            val WSSSE = clustersModel.computeCost(featured)
-            println("Within Set Sum of Squared Errors = " + WSSSE)
+            val nClusters = featureClusters(featured)
+            println(s"Number $aNumber has $nClusters clusters")
 
         } finally spark.close()
     }

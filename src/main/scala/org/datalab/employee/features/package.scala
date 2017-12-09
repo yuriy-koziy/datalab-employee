@@ -3,6 +3,8 @@ package org.datalab.employee
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+import org.apache.spark.ml.clustering.KMeans
+import org.apache.spark.sql.{DataFrame, Dataset}
 import org.apache.spark.sql.functions.udf
 import scopt.OptionParser
 
@@ -81,4 +83,32 @@ package object features {
     })
 
 
+    def featureClusters(featuredDataset: DataFrame) = {
+        // (clusters, error, error diff with prev)
+        var errors: Seq[(Int, Double, Double)] = Seq()
+
+        for(k <- 2 to 10) {
+            val error = clustersCost(featuredDataset, k)
+
+            val last = errors.lastOption
+            if (last.isEmpty) {errors = errors :+ (k, error, error)}
+            else {
+                errors = errors :+ (k, error, last.get._2 - error)
+            }
+        }
+
+        val (k, error, errorDif) = errors.tail.sortBy(_._3).last
+        println(s"Number of clusters: $k, error: $error, error diff: $errorDif")
+        k
+    }
+
+    private[features] def clustersCost(featuredDataset: DataFrame, k: Int) = {
+        val clustersModel = new KMeans()
+                .setK(k)
+                .setFeaturesCol("features")
+                .setMaxIter(100)
+                .fit(featuredDataset)
+
+        clustersModel.computeCost(featuredDataset)
+    }
 }
