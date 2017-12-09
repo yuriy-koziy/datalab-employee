@@ -1,18 +1,14 @@
 package org.datalab.employee.features
 
-import java.time.LocalDateTime
-
 import com.typesafe.config.ConfigFactory
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkConf
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.expressions.{UserDefinedFunction, Window}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.mllib.linalg.{DenseVector, Vectors, Vector => SparkVector}
-import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
-import org.apache.spark.mllib.clustering.{GaussianMixture, KMeans}
-
+import org.apache.spark.ml.linalg.{DenseVector => MLDenseVector, Vector => SparkVector}
+import org.apache.spark.ml.clustering.{GaussianMixture, KMeans}
 
 /**
   * Created by Yuriy Koziy on 12/7/17.
@@ -46,6 +42,8 @@ object Features {
 
             val calls = spark.read.option("header", "true").csv(options.inputPath)
               .filter(isDoubleUDF($"LAT") && isDoubleUDF($"LON"))
+              .withColumn("lat", when(isDoubleUDF($"LAT"), toDoubleUDF($"LAT")).otherwise(0.0d))
+              .withColumn("lon", when(isDoubleUDF($"LON"), toDoubleUDF($"LON")).otherwise(0.0d))
               .withColumn("datetime", timestampUDF($"event_start_date"))
               .withColumn("unix_timestamp", unix_timestamp(col("datetime")))
               .withColumn("weekday", weekdayUDF($"datetime"))
@@ -56,21 +54,23 @@ object Features {
               .withColumn("dist_delta", distanceBetweenUDF($"lat_previous", $"lon_previous", $"LAT", $"LON"))
               .withColumn("is_valid_coord", $"dist_delta" <= $"time_delta" * lit(maxSpeed))
 
-            val toDense = udf((vec: SparkVector) => vec.toDense, VectorType)
+            val toDense = udf((vec: SparkVector) => vec.toDense)
 
             val aNumber = calls.select("hash_number_A").distinct().takeAsList(1).get(0).getAs[String](0)
             val aNumberCalls = calls.filter($"hash_number_A" === aNumber)
             val featured = new VectorAssembler()
-              .setInputCols(Array("LAT", "LON"))
+              .setInputCols(Array("lat", "lon"))
               .setOutputCol("features")
               .transform(aNumberCalls)
-              .withColumn("features", toDense($"features"))
-              .select("features")
 
-//            val clusters = new GaussianMixture().setK(2).run(featured.rdd[DenseVector])
-//
-//            val WSSSE = clusters.computeCost(featured.rdd[DenseVector])
-//            println("Within Set Sum of Squared Errors = " + WSSSE)
+            val clustersModel = new KMeans()
+                    .setK(3)
+                    .setFeaturesCol("features")
+                    .setMaxIter(100)
+                    .fit(featured)
+
+            val WSSSE = clustersModel.computeCost(featured)
+            println("Within Set Sum of Squared Errors = " + WSSSE)
 
         } finally spark.close()
     }

@@ -71,6 +71,7 @@ package object features {
     val isDouble = (str: String) => str != null && str.matches("^[\\+\\-]{0,1}[0-9]+[\\.\\,][0-9]+$")
     val weekdayUDF = udf((dt: String) => LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).getDayOfWeek.getValue)
     val isDoubleUDF = udf((str: String) => isDouble(str))
+    val toDoubleUDF = udf((str: String) => str.toDouble)
     val distanceBetweenUDF = udf((lat1: String,lon1: String,lat2: String, lon2: String) => {
         if (isDouble(lat1) && isDouble(lat2) && isDouble(lon1) && isDouble(lon2)) {
             val dx = lat1.toDouble - lat2.toDouble
@@ -78,5 +79,6 @@ package object features {
             Math.sqrt(dx * dx + dy * dy)
         } else 0
     })
+
 
 }
